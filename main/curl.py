@@ -46,7 +46,7 @@ class DCO_dataset(Dataset):
 
     def __getitem__(self, idx):
         # 返回: 电场E(3通道), 旋度curl(3通道), 坐标r(3通道)
-        return self.E[idx], self.curl[idx], self.r[idx]
+        return self.E[idx], self.r[idx], self.curl[idx]
 
 # =================== 3D卷积基础模块 ===================
 class ConvBlock3D(nn.Module):
