@@ -285,8 +285,6 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         optimizer.step()
         
         total_loss += loss.item()
-        if (batch_idx + 1) % 10 == 0:
-            print(f'  Batch [{batch_idx+1}/{len(dataloader)}], Loss: {loss.item():.6f}')
     
     return total_loss / len(dataloader)
 
@@ -437,7 +435,7 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
 def main():
     batch_size = 30
     num_epochs = 1000
-    learning_rate = 1e-4
+    learning_rate = 1e-2
     base_features = 32
 
     # 创建数据集和数据加载器
@@ -492,9 +490,6 @@ def main():
     # 训练循环
     print("开始训练...\n")
     for epoch in range(num_epochs):
-        print(f"{'='*70}")
-        print(f"Epoch {epoch+1}/{num_epochs}")
-        print(f"{'='*70}")
         
         train_loss = train_epoch(model, train_loader, optimizer, criterion, device)
         test_loss = validate(model, test_loader, criterion, device)
@@ -503,11 +498,11 @@ def main():
         history['train_loss'].append(train_loss)
         history['test_loss'].append(test_loss)
         history['test_mre'].append(test_mre)
-        
-        print(f"\n结果:")
-        print(f"  Train Loss:  {train_loss:.6f}")
-        print(f"  Test Loss:   {test_loss:.6f}")
-        print(f"  Test MRE:    {test_mre:.6f}")
+
+        print(f"Epoch [{epoch+1:4d}/{num_epochs}],"
+              f" Train Loss: {train_loss:.6f},"
+              f" Test Loss: {test_loss:.6f},"
+              f" Test MRE: {test_mre:.6f}")
         
         if test_loss < best_loss:
             best_loss = test_loss
