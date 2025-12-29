@@ -240,28 +240,32 @@ class DeepONet_UNet3D(nn.Module):
         output = self.outc(x)  # (batch, 3, Nx, Ny, Nz)
         return output
 
-class ChannelRelativeL2Loss(nn.Module):
-    """每个通道独立计算相对L2损失"""
+class ChannelNormalizedMSELoss(nn.Module):
+    """对每个通道的MSE损失进行归一化"""
     def __init__(self, epsilon=1e-8):
-        super(ChannelRelativeL2Loss, self).__init__()
+        super(ChannelNormalizedMSELoss, self).__init__()
         self.epsilon = epsilon
     
     def forward(self, pred, target):
-        batch_size, num_channels = pred.shape[0], pred.shape[1]
+        # pred, target: [batch, 3, Nx, Ny, Nz]
+        num_channels = pred.shape[1]
         total_loss = 0.0
         
-        for i in range(batch_size):
-            for c in range(num_channels):
-                pred_c = pred[i, c].flatten()
-                target_c = target[i, c].flatten()
-                
-                diff_norm = torch.norm(pred_c - target_c, p=2)
-                target_norm = torch.norm(target_c, p=2) + self.epsilon
-                
-                rel_loss = diff_norm / target_norm
-                total_loss += rel_loss
-        
-        return total_loss / (batch_size * num_channels)
+        for c in range(num_channels):
+            # 提取当前通道
+            pred_c = pred[:, c]
+            target_c = target[:, c]
+            
+            # 计算该通道的MSE
+            mse_c = torch.mean((pred_c - target_c) ** 2)
+            
+            # 用该通道目标值的方差归一化
+            target_var = torch.var(target_c) + self.epsilon
+            normalized_mse = mse_c / target_var
+            
+            total_loss += normalized_mse
+
+        return total_loss / num_channels
 
 # ==================== 训练函数 ====================
 def train_epoch(model, dataloader, optimizer, criterion, device):
@@ -473,7 +477,7 @@ def main():
     print(f"{'='*70}\n")
 
     # 损失函数和优化器
-    criterion = ChannelRelativeL2Loss()
+    criterion = ChannelNormalizedMSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # 训练历史
