@@ -437,7 +437,7 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
 def main():
     batch_size = 30
     num_epochs = 1000
-    learning_rate = 1e-4
+    learning_rate = 1e-3
     base_features = 32
 
     # 创建数据集和数据加载器
