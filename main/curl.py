@@ -192,10 +192,6 @@ class DeepONet_UNet3D(nn.Module):
     def __init__(self, in_channels_branch=3, in_channels_trunk=3, out_channels=3, base_features=32):
         super(DeepONet_UNet3D, self).__init__()
         
-        # 输入归一化层
-        self.input_bn_E = nn.BatchNorm3d(in_channels_branch)
-        self.input_bn_r = nn.BatchNorm3d(in_channels_trunk)
-
         # Branch Network: 处理电场 E
         self.branch_net = BranchNetwork(in_channels_branch, base_features)
         
@@ -219,8 +215,6 @@ class DeepONet_UNet3D(nn.Module):
         Returns:
             curl: 旋度 (batch, 3, Nx, Ny, Nz)
         """
-        E = self.input_bn_E(E)
-        r = self.input_bn_r(r)
         branch_features = self.branch_net(E)  # [f1_b, f2_b, f3_b, f4_b, f5_b]
         trunk_features = self.trunk_net(r)    # [f1_t, f2_t, f3_t, f4_t, f5_t]
         
