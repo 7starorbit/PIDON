@@ -183,8 +183,8 @@ class DeepONet_UNet3D(nn.Module):
     4. 解码器包含独立的上采样和解码卷积层
     5. 最终输出旋度场
     
-    卷积参数设置（符合论文）:
-    - kernel_size=3, stride=1, padding=1 (保持尺寸)
+    卷积参数设置:
+    - kernel_size=3, stride=1, padding=1
     - 激活函数: GELU
     - 下采样: MaxPool stride=2
     - 上采样: Upsample scale=2 或 ConvTranspose stride=2
@@ -192,6 +192,10 @@ class DeepONet_UNet3D(nn.Module):
     def __init__(self, in_channels_branch=3, in_channels_trunk=3, out_channels=3, base_features=32):
         super(DeepONet_UNet3D, self).__init__()
         
+        # 输入归一化层
+        self.input_bn_E = nn.BatchNorm3d(in_channels_branch)
+        self.input_bn_r = nn.BatchNorm3d(in_channels_trunk)
+
         # Branch Network: 处理电场 E
         self.branch_net = BranchNetwork(in_channels_branch, base_features)
         
@@ -202,7 +206,7 @@ class DeepONet_UNet3D(nn.Module):
         self.decoder1 = DecoderBlock(base_features * 16, base_features * 8, base_features * 8)  #512/2 + 256 -> 256
         self.decoder2 = DecoderBlock(base_features * 8, base_features * 4, base_features * 4)   #256/2 + 128 -> 128
         self.decoder3 = DecoderBlock(base_features * 4, base_features * 2, base_features * 2)   #128/2 + 64 -> 64
-        self.decoder4 = DecoderBlock(base_features * 2, base_features, base_features)           #64/2 + 32 -> 32
+        self.decoder4 = DecoderBlock(base_features * 2, base_features, base_features)   #64/2 + 32 -> 32
         
         # 输出卷积层 (1x1卷积，stride=1)
         self.outc = nn.Conv3d(base_features, out_channels, kernel_size=1, stride=1, padding=0)
@@ -215,6 +219,8 @@ class DeepONet_UNet3D(nn.Module):
         Returns:
             curl: 旋度 (batch, 3, Nx, Ny, Nz)
         """
+        E = self.input_bn_E(E)
+        r = self.input_bn_r(r)
         branch_features = self.branch_net(E)  # [f1_b, f2_b, f3_b, f4_b, f5_b]
         trunk_features = self.trunk_net(r)    # [f1_t, f2_t, f3_t, f4_t, f5_t]
         
@@ -285,7 +291,7 @@ def validate(model, dataloader, criterion, device):
 def compute_MRE(model, dataloader, device, epsilon=1e-10):
     model.eval()
     total_mre = 0.0
-    num_batches = 0
+    num_samples = 0
     
     with torch.no_grad():
         for E, r, curl_target in dataloader:
@@ -306,8 +312,7 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
                 
                 non_zero_mask = torch.abs(target_flat) > epsilon
                 
-                relative_error_non_zero = torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / \
-                                         torch.abs(target_flat[non_zero_mask])
+                relative_error_non_zero = torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask])
                 
                 absolute_error_zero = torch.abs(pred_flat[~non_zero_mask])
                 
@@ -315,9 +320,9 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
                 mre_sample = torch.mean(all_errors)
                 
                 total_mre += mre_sample.item()
-                num_batches += 1
+                num_samples += 1
     
-    return total_mre / num_batches
+    return total_mre / num_samples
 
 # ==================== 可视化函数 ====================
 def visualize_results(model, dataset, device, num_samples=4, save_dir='results'):
@@ -404,19 +409,18 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
 
 def main():
     batch_size = 30
-    num_epochs = 100
-    learning_rate = 1e-3
+    num_epochs = 1000
+    learning_rate = 1e-4
     base_features = 32
-    weight_decay = 1e-5 # L2正则化参数
 
     # 创建数据集和数据加载器
     print("加载数据集...")
     train_dataset = DCO_dataset(mode='train')
     test_dataset = DCO_dataset(mode='test')
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, 
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
                               num_workers=0, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, 
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False,
                              num_workers=0, pin_memory=True)
     # 创建模型
     print("\n创建模型...")
@@ -432,7 +436,6 @@ def main():
     print(f"\n{'='*70}")
     print(f"{'DeepONet 3D-UNet 旋度算子学习器':^70}")
     print(f"{'='*70}")
-    print(f"  架构设计: 基于论文图3的精确实现")
     print(f"  - Branch Network (电场编码器): {branch_params/1e6:.2f}M 参数")
     print(f"  - Trunk Network (坐标编码器):  {trunk_params/1e6:.2f}M 参数")
     print(f"  - Decoder (解码器):             {decoder_params/1e6:.2f}M 参数")
@@ -448,10 +451,7 @@ def main():
 
     # 损失函数和优化器
     criterion = nn.MSELoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=10, min_lr=1e-6
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # 训练历史
     history = {
@@ -477,17 +477,10 @@ def main():
         history['test_loss'].append(test_loss)
         history['test_mre'].append(test_mre)
         
-        old_lr = optimizer.param_groups[0]['lr']
-        scheduler.step(test_loss)
-        current_lr = optimizer.param_groups[0]['lr']
-        if current_lr != old_lr:
-            print(f"  学习率调整: {old_lr:.2e} -> {current_lr:.2e}")
-        
         print(f"\n结果:")
         print(f"  Train Loss:  {train_loss:.6f}")
         print(f"  Test Loss:   {test_loss:.6f}")
         print(f"  Test MRE:    {test_mre:.6f}")
-        print(f"  Learning Rate: {current_lr:.2e}")
         
         if test_loss < best_loss:
             best_loss = test_loss
@@ -495,7 +488,6 @@ def main():
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'scheduler_state_dict': scheduler.state_dict(),
                 'train_loss': train_loss,
                 'test_loss': test_loss,
                 'test_mre': test_mre,
