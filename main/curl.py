@@ -234,32 +234,32 @@ class DeepONet_UNet3D(nn.Module):
         output = self.outc(x)  # (batch, 3, Nx, Ny, Nz)
         return output
 
-class ChannelNormalizedMSELoss(nn.Module):
-    """对每个通道的MSE损失进行归一化"""
-    def __init__(self, epsilon=1e-8):
-        super(ChannelNormalizedMSELoss, self).__init__()
-        self.epsilon = epsilon
+# class ChannelNormalizedMSELoss(nn.Module):
+#     """对每个通道的MSE损失进行归一化"""
+#     def __init__(self, epsilon=1e-8):
+#         super(ChannelNormalizedMSELoss, self).__init__()
+#         self.epsilon = epsilon
     
-    def forward(self, pred, target):
-        # pred, target: [batch, 3, Nx, Ny, Nz]
-        num_channels = pred.shape[1]
-        total_loss = 0.0
+#     def forward(self, pred, target):
+#         # pred, target: [batch, 3, Nx, Ny, Nz]
+#         num_channels = pred.shape[1]
+#         total_loss = 0.0
         
-        for c in range(num_channels):
-            # 提取当前通道
-            pred_c = pred[:, c]
-            target_c = target[:, c]
+#         for c in range(num_channels):
+#             # 提取当前通道
+#             pred_c = pred[:, c]
+#             target_c = target[:, c]
             
-            # 计算该通道的MSE
-            mse_c = torch.mean((pred_c - target_c) ** 2)
+#             # 计算该通道的MSE
+#             mse_c = torch.mean((pred_c - target_c) ** 2)
             
-            # 用该通道目标值的方差归一化
-            target_var = torch.var(target_c) + self.epsilon
-            normalized_mse = mse_c / target_var
+#             # 用该通道目标值的方差归一化
+#             target_var = torch.var(target_c) + self.epsilon
+#             normalized_mse = mse_c / target_var
             
-            total_loss += normalized_mse
+#             total_loss += normalized_mse
 
-        return total_loss / num_channels
+#         return total_loss / num_channels
 
 # ==================== 训练函数 ====================
 def train_epoch(model, dataloader, optimizer, criterion, device):
@@ -274,10 +274,14 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         
         optimizer.zero_grad()
         curl_pred = model(E, r)
-        loss = criterion(curl_pred, curl_target)
+        loss1 = criterion(curl_pred[:,0:1,:,:,:], curl_target[:,0:1,:,:,:])
+        loss2 = criterion(curl_pred[:,1:2,:,:,:], curl_target[:,1:2,:,:,:])
+        loss3 = criterion(curl_pred[:,2:3,:,:,:], curl_target[:,2:3,:,:,:])
+        loss = loss1 + loss2 + loss3
         loss.backward()
         optimizer.step()
-        
+        if (batch_idx + 1) % 10 == 0:
+            print(f'loss1: {loss1.item():.6f}, loss2: {loss2.item():.6f}, loss3: {loss3.item():.6f}, total_loss: {loss.item():.6f}')
         total_loss += loss.item()
     
     return total_loss / len(dataloader)
@@ -469,7 +473,7 @@ def main():
     print(f"{'='*70}\n")
 
     # 损失函数和优化器
-    criterion = ChannelNormalizedMSELoss()
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # 训练历史
@@ -508,7 +512,7 @@ def main():
                 'test_loss': test_loss,
                 'test_mre': test_mre,
             }, 'checkpoints/best_model.pth')
-            print(f"  ✓ 保存最佳模型 (Test Loss: {best_loss:.6f}, MRE: {test_mre:.6f})")
+            # print(f"  ✓ 保存最佳模型 (Test Loss: {best_loss:.6f}, MRE: {test_mre:.6f})")
         
         print()
     
