@@ -337,6 +337,9 @@ def validate(model, dataloader, criterion, device):
 def compute_MRE(model, dataloader, device, epsilon=1e-10):
     model.eval()
     total_mre = 0.0
+    total_mre0 = 0.0
+    total_mre1 = 0.0
+    total_mre2 = 0.0
     num_samples = 0
     # curl_mean = dataloader.dataset.curl_mean.to(device)
     # curl_std = dataloader.dataset.curl_std.to(device)
