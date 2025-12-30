@@ -503,8 +503,10 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
 
 def main():
     batch_size = 30
-    num_epochs = 200
-    learning_rate = 1e-2
+    num_epochs_adam = 200
+    num_epochs_lbfgs = 100
+    learning_rate_adam = 1e-3
+    learning_rate_lbfgs = 0.1
     base_features = 32
 
     # 创建数据集和数据加载器
@@ -533,6 +535,9 @@ def main():
     print(f"  - Trunk Network (坐标编码器):  {trunk_params/1e6:.2f}M 参数")
     print(f"  - Decoder (解码器):             {decoder_params/1e6:.2f}M 参数")
     print(f"  总参数量: {total_params/1e6:.2f}M")
+    print(f"\n  训练策略: 二阶段优化 (Adam预热 + L-BFGS精调)")
+    print(f"  阶段1: Adam优化器, {num_epochs_adam} epochs, lr={learning_rate_adam}")
+    print(f"  阶段2: L-BFGS优化器, {num_epochs_lbfgs} epochs, lr={learning_rate_lbfgs}")
     print(f"\n  卷积设置: kernel_size=3, stride=1, padding=1")
     print(f"  特征融合: Hadamard Product (逐元素相乘)")
     print(f"  跳跃连接: 融合特征传递到解码器各层")
@@ -544,22 +549,23 @@ def main():
 
     # 损失函数和优化器
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     # 训练历史
     history = {
         'train_loss': [],
         'test_loss': [],
-        'test_mre': []
+        'test_mre': [],
+        'phase': []
     }
     best_loss = float('inf')
     os.makedirs('checkpoints', exist_ok=True)
 
     # 训练循环
-    print("开始训练...\n")
-    for epoch in range(num_epochs):
+    print("开始训练Adam阶段...\n")
+    optimizer_adam = torch.optim.Adam(model.parameters(), lr=learning_rate_adam)
+    for epoch in range(num_epochs_adam):
         
-        train_loss = train_epoch(model, train_loader, optimizer, criterion, device)
+        train_loss = train_epoch(model, train_loader, optimizer_adam, criterion, device)
         test_loss = validate(model, test_loader, criterion, device)
         # test_mre = compute_MRE(model, test_loader, device)
         test_mre0, test_mre1, test_mre2 = compute_MRE(model, test_loader, device)
@@ -568,8 +574,9 @@ def main():
         history['train_loss'].append(train_loss)
         history['test_loss'].append(test_loss)
         history['test_mre'].append(test_mre)
+        history['phase'].append('Adam')
 
-        print(f"Epoch [{epoch+1:4d}/{num_epochs}],"
+        print(f"[Adam] Epoch [{epoch+1:4d}/{num_epochs_adam}],"
               f" Train Loss: {train_loss:.6f},"
               f" Test Loss: {test_loss:.6f},"
               f" Test MRE0: {test_mre0:.6f},"
@@ -582,51 +589,119 @@ def main():
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
+                'optimizer_state_dict': optimizer_adam.state_dict(),
+                'train_loss': train_loss,
+                'test_loss': test_loss,
+                'test_mre': test_mre,
+            }, 'checkpoints/best_model_adam.pth')
+            # print(f"  ✓ 保存最佳模型 (Test Loss: {best_loss:.6f}, MRE: {test_mre:.6f})")
+    
+    print("\n开始训练L-BFGS阶段...\n")
+    optimizer_lbfgs = torch.optim.LBFGS(
+        model.parameters(),
+        lr=learning_rate_lbfgs,
+        max_iter=20,           # 每次调用最多20次线搜索
+        max_eval=25,           # 最多25次函数评估
+        tolerance_grad=1e-7,   # 梯度容差
+        tolerance_change=1e-9, # 参数变化容差
+        history_size=50,      # 存储50个历史信息用于Hessian近似
+        line_search_fn='strong_wolfe'  # 使用强Wolfe条件线搜索
+    )
+    def closure():
+        optimizer_lbfgs.zero_grad()
+        total_loss = 0.0
+        for E, r, curl_target in train_loader:
+            E = E.to(device)
+            r = r.to(device)
+            curl_target = curl_target.to(device)
+            curl_pred = model(E, r)
+            loss = criterion(curl_pred, curl_target)
+            total_loss += loss
+
+        avg_loss = total_loss / len(train_loader)
+        avg_loss.backward()
+        return avg_loss
+    for epoch in range(num_epochs_lbfgs):
+        model.train()
+        loss = optimizer_lbfgs.step(closure)
+        train_loss = loss.item()
+        test_loss = validate(model, test_loader, criterion, device)
+        test_mre0, test_mre1, test_mre2 = compute_MRE(model, test_loader, device)
+        test_mre = (test_mre0 + test_mre1 + test_mre2) / 3.0
+        history['train_loss'].append(train_loss)
+        history['test_loss'].append(test_loss)
+        history['test_mre'].append(test_mre)
+        history['phase'].append('LBFGS')
+        print(f"[L-BFGS] Epoch [{epoch+1:4d}/{num_epochs_lbfgs}],"
+              f" Train Loss: {train_loss:.6f},"
+              f" Test Loss: {test_loss:.6f},"
+              f" Test MRE0: {test_mre0:.6f},"
+              f" Test MRE1: {test_mre1:.6f},"
+              f" Test MRE2: {test_mre2:.6f},"
+              f" Test MRE: {test_mre:.6f}")
+        if test_loss < best_loss:
+            best_loss = test_loss
+            torch.save({
+                'epoch': epoch + num_epochs_adam,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer_lbfgs.state_dict(),
                 'train_loss': train_loss,
                 'test_loss': test_loss,
                 'test_mre': test_mre,
             }, 'checkpoints/best_model.pth')
             # print(f"  ✓ 保存最佳模型 (Test Loss: {best_loss:.6f}, MRE: {test_mre:.6f})")
-        
-        print()
-    
+
     # 绘制训练曲线
-    print("绘制训练曲线...")
-    plt.figure(figsize=(15, 4))
+        print("绘制训练曲线...")
+    plt.figure(figsize=(18, 5))
     
+    adam_epochs = num_epochs_adam
+    total_epochs = num_epochs_adam + num_epochs_lbfgs
+    
+    # 子图1: Loss曲线
     plt.subplot(1, 3, 1)
     plt.plot(history['train_loss'], label='Train Loss', linewidth=2)
     plt.plot(history['test_loss'], label='Test Loss', linewidth=2)
+    plt.axvline(x=adam_epochs, color='red', linestyle='--', label='Adam→L-BFGS', linewidth=1.5)
     plt.xlabel('Epoch', fontsize=12)
     plt.ylabel('MSE Loss', fontsize=12)
     plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
-    plt.title('Training and Test Loss', fontsize=12)
+    plt.title('Training Progress (Two-Stage)', fontsize=12)
     
+    # 子图2: Log-scale Loss
     plt.subplot(1, 3, 2)
     plt.semilogy(history['train_loss'], label='Train Loss', linewidth=2)
     plt.semilogy(history['test_loss'], label='Test Loss', linewidth=2)
+    plt.axvline(x=adam_epochs, color='red', linestyle='--', label='Adam→L-BFGS', linewidth=1.5)
     plt.xlabel('Epoch', fontsize=12)
     plt.ylabel('MSE Loss (log scale)', fontsize=12)
     plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
-    plt.title('Training and Test Loss (Log Scale)', fontsize=12)
+    plt.title('Loss (Log Scale)', fontsize=12)
     
+    # 子图3: MRE曲线
     plt.subplot(1, 3, 3)
     plt.plot(history['test_mre'], linewidth=2, color='green')
+    plt.axvline(x=adam_epochs, color='red', linestyle='--', label='Adam→L-BFGS', linewidth=1.5)
     plt.xlabel('Epoch', fontsize=12)
-    plt.ylabel('Mean Relative Error (MRE)', fontsize=12)
+    plt.ylabel('Mean Relative Error', fontsize=12)
+    plt.legend(fontsize=10)
     plt.grid(True, alpha=0.3)
     plt.title('Test MRE', fontsize=12)
     
     plt.tight_layout()
-    plt.savefig('checkpoints/training_curves.png', dpi=150, bbox_inches='tight')
+    plt.savefig('checkpoints/training_curves_two_stage.png', dpi=150, bbox_inches='tight')
     plt.show()
     
     # 加载最佳模型并可视化
     print("\n加载最佳模型进行可视化...")
-    checkpoint = torch.load('checkpoints/best_model.pth')
+    if os.path.exists('checkpoints/best_model_lbfgs.pth'):
+        checkpoint = torch.load('checkpoints/best_model_lbfgs.pth')
+        print(f"加载L-BFGS阶段最佳模型 (Epoch {checkpoint['epoch']+1})")
+    else:
+        checkpoint = torch.load('checkpoints/best_model_adam.pth')
+        print(f"加载Adam阶段最佳模型 (Epoch {checkpoint['epoch']+1})")
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"最佳模型来自 Epoch {checkpoint['epoch']+1}")
     print(f"  Test Loss: {checkpoint['test_loss']:.6f}")
