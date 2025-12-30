@@ -359,22 +359,47 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
                 pred = curl_pred[i]
                 target = curl_target[i]
                 
-                pred_flat = pred.flatten()
-                target_flat = target.flatten()
-                
-                non_zero_mask = torch.abs(target_flat) > epsilon
-                
-                relative_error_non_zero = torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask])
-                
-                absolute_error_zero = torch.abs(pred_flat[~non_zero_mask])
-                
-                all_errors = torch.cat([relative_error_non_zero, absolute_error_zero])
-                mre_sample = torch.mean(all_errors)
-                
-                total_mre += mre_sample.item()
+                pred_flat0 =pred[0].flatten()
+                target_flat0 = target[0].flatten()
+                none_zero_mask0 = torch.abs(target_flat0) > epsilon
+                relative_error_non_zero0 = torch.abs(pred_flat0[none_zero_mask0] - target_flat0[none_zero_mask0]) / torch.abs(target_flat0[none_zero_mask0])
+                absolute_error_zero0 = torch.abs(pred_flat0[~none_zero_mask0])
+                all_errors0 = torch.cat([relative_error_non_zero0, absolute_error_zero0])
+                mre_sample0 = torch.mean(all_errors0)
+                total_mre0 += mre_sample0.item()
+                pred_flat1 =pred[1].flatten()
+                target_flat1 = target[1].flatten()
+                none_zero_mask1 = torch.abs(target_flat1) > epsilon
+                relative_error_non_zero1 = torch.abs(pred_flat1[none_zero_mask1] - target_flat1[none_zero_mask1]) / torch.abs(target_flat1[none_zero_mask1])
+                absolute_error_zero1 = torch.abs(pred_flat1[~none_zero_mask1])
+                all_errors1 = torch.cat([relative_error_non_zero1, absolute_error_zero1])
+                mre_sample1 = torch.mean(all_errors1)
+                total_mre1 += mre_sample1.item()
+                pred_flat2 =pred[2].flatten()
+                target_flat2 = target[2].flatten()
+                none_zero_mask2 = torch.abs(target_flat2) > epsilon
+                relative_error_non_zero2 = torch.abs(pred_flat2[none_zero_mask2] - target_flat2[none_zero_mask2]) / torch.abs(target_flat2[none_zero_mask2])
+                absolute_error_zero2 = torch.abs(pred_flat2[~none_zero_mask2])
+                all_errors2 = torch.cat([relative_error_non_zero2, absolute_error_zero2])
+                mre_sample2 = torch.mean(all_errors2)
+                total_mre2 += mre_sample2.item()
                 num_samples += 1
-    
-    return total_mre / num_samples
+                # pred_flat = pred.flatten()
+                # target_flat = target.flatten()
+                
+                # non_zero_mask = torch.abs(target_flat) > epsilon
+                
+                # relative_error_non_zero = torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask])
+                
+                # absolute_error_zero = torch.abs(pred_flat[~non_zero_mask])
+                
+                # all_errors = torch.cat([relative_error_non_zero, absolute_error_zero])
+                # mre_sample = torch.mean(all_errors)
+                
+                # total_mre += mre_sample.item()
+                # num_samples += 1
+    return total_mre0 / num_samples, total_mre1 / num_samples, total_mre2 / num_samples
+    # return total_mre / num_samples
 
 # ==================== 可视化函数 ====================
 def visualize_results(model, dataset, device, num_samples=4, save_dir='results'):
@@ -533,7 +558,9 @@ def main():
         
         train_loss = train_epoch(model, train_loader, optimizer, criterion, device)
         test_loss = validate(model, test_loader, criterion, device)
-        test_mre = compute_MRE(model, test_loader, device)
+        # test_mre = compute_MRE(model, test_loader, device)
+        test_mre0, test_mre1, test_mre2 = compute_MRE(model, test_loader, device)
+        test_mre = (test_mre0 + test_mre1 + test_mre2) / 3.0
         
         history['train_loss'].append(train_loss)
         history['test_loss'].append(test_loss)
@@ -542,6 +569,9 @@ def main():
         print(f"Epoch [{epoch+1:4d}/{num_epochs}],"
               f" Train Loss: {train_loss:.6f},"
               f" Test Loss: {test_loss:.6f},"
+              f" Test MRE0: {test_mre0:.6f},"
+              f" Test MRE1: {test_mre1:.6f},"
+              f" Test MRE2: {test_mre2:.6f},"
               f" Test MRE: {test_mre:.6f}")
         
         if test_loss < best_loss:
