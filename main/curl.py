@@ -563,7 +563,7 @@ def main():
     # 训练循环
     print("开始训练Adam阶段...\n")
     optimizer_adam = torch.optim.Adam(model.parameters(), lr=learning_rate_adam)
-    for epoch in range(num_epochs_adam):
+    for epoch in range(2):
         
         train_loss = train_epoch(model, train_loader, optimizer_adam, criterion, device)
         test_loss = validate(model, test_loader, criterion, device)
@@ -616,15 +616,14 @@ def main():
             curl_target = curl_target.to(device)
             curl_pred = model(E, r)
             loss = criterion(curl_pred, curl_target)
-            total_loss += loss
+            loss.backward()
+            total_loss += loss.item()
 
         avg_loss = total_loss / len(train_loader)
-        avg_loss.backward()
         return avg_loss
     for epoch in range(num_epochs_lbfgs):
         model.train()
-        loss = optimizer_lbfgs.step(closure)
-        train_loss = loss.item()
+        train_loss = optimizer_lbfgs.step(closure)
         test_loss = validate(model, test_loader, criterion, device)
         test_mre0, test_mre1, test_mre2 = compute_MRE(model, test_loader, device)
         test_mre = (test_mre0 + test_mre1 + test_mre2) / 3.0
