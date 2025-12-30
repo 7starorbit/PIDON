@@ -338,8 +338,8 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
     model.eval()
     total_mre = 0.0
     num_samples = 0
-    curl_mean = dataloader.dataset.curl_mean.to(device)
-    curl_std = dataloader.dataset.curl_std.to(device)
+    # curl_mean = dataloader.dataset.curl_mean.to(device)
+    # curl_std = dataloader.dataset.curl_std.to(device)
     
     with torch.no_grad():
         for E, r, curl_target in dataloader:
@@ -349,9 +349,9 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
             
             curl_pred = model(E, r)
 
-            # 反归一化
-            curl_pred = curl_pred * (curl_std + 1e-8) + curl_mean
-            curl_target = curl_target * (curl_std + 1e-8) + curl_mean
+            # # 反归一化
+            # curl_pred = curl_pred * (curl_std + 1e-8) + curl_mean
+            # curl_target = curl_target * (curl_std + 1e-8) + curl_mean
             
             # 计算每个样本的MRE
             batch_size = curl_pred.shape[0]
