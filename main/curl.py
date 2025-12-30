@@ -563,7 +563,7 @@ def main():
     # 训练循环
     print("开始训练Adam阶段...\n")
     optimizer_adam = torch.optim.Adam(model.parameters(), lr=learning_rate_adam)
-    for epoch in range(2):
+    for epoch in range(num_epochs_adam):
         
         train_loss = train_epoch(model, train_loader, optimizer_adam, criterion, device)
         test_loss = validate(model, test_loader, criterion, device)
@@ -651,7 +651,7 @@ def main():
             # print(f"  ✓ 保存最佳模型 (Test Loss: {best_loss:.6f}, MRE: {test_mre:.6f})")
 
     # 绘制训练曲线
-        print("绘制训练曲线...")
+    print("绘制训练曲线...")
     plt.figure(figsize=(18, 5))
     
     adam_epochs = num_epochs_adam
