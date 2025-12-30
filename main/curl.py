@@ -16,12 +16,13 @@ torch.manual_seed(1234)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
-# =================== 数据集定义 ===================
+# =================== 数据集定义并归一化 ===================
 class DCO_dataset(Dataset):
-    def __init__(self, mode='train', data_dir='../DCO_data/'):
+    def __init__(self, mode='train', data_dir='../DCO_data/', normalize=True):
         super(DCO_dataset, self).__init__()
         self.mode = mode
         self.data_dir = data_dir
+        self.normalize = normalize
         if self.mode == 'train':
             mat_data = sci.io.loadmat(os.path.join(self.data_dir, 'train_data.mat'))
             self.E = mat_data['E_train']    #(Nx, Ny, Nz, 3, n_samples)
@@ -40,6 +41,36 @@ class DCO_dataset(Dataset):
         print(f"  E shape: {self.E.shape}")
         print(f"  curl shape: {self.curl.shape}")
         print(f"  r shape: {self.r.shape}")
+        if self.normalize is True :
+            if self.mode == 'train':
+                self.E_mean = torch.mean(self.E, dim=(0,2,3,4), keepdim=True)
+                self.E_std = torch.std(self.E, dim=(0,2,3,4), keepdim=True)
+                self.curl_mean = torch.mean(self.curl, dim=(0,2,3,4), keepdim=True)
+                self.curl_std = torch.std(self.curl, dim=(0,2,3,4), keepdim=True)
+                self.r_mean = torch.mean(self.r, dim=(0,2,3,4), keepdim=True)
+                self.r_std = torch.std(self.r, dim=(0,2,3,4), keepdim=True)
+                self.E = (self.E - self.E_mean) / (self.E_std + 1e-8)
+                self.curl = (self.curl - self.curl_mean) / (self.curl_std + 1e-8)
+                self.r = (self.r - self.r_mean) / (self.r_std + 1e-8)
+                torch.save({
+                    'E_mean': self.E_mean,
+                    'E_std': self.E_std,
+                    'curl_mean': self.curl_mean,
+                    'curl_std': self.curl_std,
+                    'r_mean': self.r_mean,
+                    'r_std': self.r_std
+                }, os.path.join('./', 'norm_stats.pth'))
+            else:
+                norm_stats = torch.load(os.path.join('./', 'norm_stats.pth'))
+                self.E_mean = norm_stats['E_mean']
+                self.E_std = norm_stats['E_std']
+                self.curl_mean = norm_stats['curl_mean']
+                self.curl_std = norm_stats['curl_std']
+                self.r_mean = norm_stats['r_mean']
+                self.r_std = norm_stats['r_std']
+                self.E = (self.E - self.E_mean) / (self.E_std + 1e-8)
+                self.curl = (self.curl - self.curl_mean) / (self.curl_std + 1e-8)
+                self.r = (self.r - self.r_mean) / (self.r_std + 1e-8)
 
     def __len__(self):
         return self.n_samples
@@ -274,14 +305,9 @@ def train_epoch(model, dataloader, optimizer, criterion, device):
         
         optimizer.zero_grad()
         curl_pred = model(E, r)
-        loss1 = criterion(curl_pred[:,0:1,:,:,:], curl_target[:,0:1,:,:,:])
-        loss2 = criterion(curl_pred[:,1:2,:,:,:], curl_target[:,1:2,:,:,:])
-        loss3 = criterion(curl_pred[:,2:3,:,:,:], curl_target[:,2:3,:,:,:])
-        loss = loss1 + loss2 + loss3
+        loss = criterion(curl_pred, curl_target)
         loss.backward()
         optimizer.step()
-        if (batch_idx + 1) % 10 == 0:
-            print(f'loss1: {loss1.item():.6f}, loss2: {loss2.item():.6f}, loss3: {loss3.item():.6f}, total_loss: {loss.item():.6f}')
         total_loss += loss.item()
     
     return total_loss / len(dataloader)
@@ -305,9 +331,6 @@ def validate(model, dataloader, criterion, device):
             
             # 累加损失
             total_loss += loss.item()
-            
-            if (batch_idx + 1) % 10 == 0:
-                print(f'  Validation Batch [{batch_idx+1}/{len(dataloader)}], Loss: {loss.item():.6f}')
     avg_loss = total_loss / len(dataloader)
     return avg_loss
 
@@ -315,6 +338,8 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
     model.eval()
     total_mre = 0.0
     num_samples = 0
+    curl_mean = dataloader.dataset.curl_mean.to(device)
+    curl_std = dataloader.dataset.curl_std.to(device)
     
     with torch.no_grad():
         for E, r, curl_target in dataloader:
@@ -323,6 +348,10 @@ def compute_MRE(model, dataloader, device, epsilon=1e-10):
             curl_target = curl_target.to(device)
             
             curl_pred = model(E, r)
+
+            # 反归一化
+            curl_pred = curl_pred * (curl_std + 1e-8) + curl_mean
+            curl_target = curl_target * (curl_std + 1e-8) + curl_mean
             
             # 计算每个样本的MRE
             batch_size = curl_pred.shape[0]
@@ -352,7 +381,11 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
     """可视化预测结果"""
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
-    
+
+    # 获取归一化统计量
+    curl_mean = dataset.curl_mean
+    curl_std = dataset.curl_std
+
     fig, axes = plt.subplots(num_samples, 6, figsize=(18, 3*num_samples))
     if num_samples == 1:
         axes = axes.reshape(1, -1)
@@ -364,6 +397,9 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
+            # 反归一化
+            curl_pred = curl_pred * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
+            curl_target = curl_target * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
             
             # 取中间切片
             z_mid = curl_target.shape[-1] // 2
@@ -398,6 +434,9 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
     """可视化误差分布"""
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
+
+    curl_mean = dataset.curl_mean
+    curl_std = dataset.curl_std
     
     fig, axes = plt.subplots(num_samples, 3, figsize=(12, 3*num_samples))
     if num_samples == 1:
@@ -410,6 +449,10 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
+
+            # 反归一化
+            curl_pred = curl_pred * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
+            curl_target = curl_target * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
             
             # 计算误差
             error = torch.abs(curl_pred - curl_target)
@@ -433,13 +476,13 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
 def main():
     batch_size = 30
     num_epochs = 1000
-    learning_rate = 1e-2
+    learning_rate = 1e-3
     base_features = 32
 
     # 创建数据集和数据加载器
     print("加载数据集...")
-    train_dataset = DCO_dataset(mode='train')
-    test_dataset = DCO_dataset(mode='test')
+    train_dataset = DCO_dataset(mode='train', normalize=True)
+    test_dataset = DCO_dataset(mode='test', normalize=True)
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
                               num_workers=0, pin_memory=True)
@@ -447,8 +490,7 @@ def main():
                              num_workers=0, pin_memory=True)
     # 创建模型
     print("\n创建模型...")
-    model = DeepONet_UNet3D(in_channels_branch=3, in_channels_trunk=3, 
-                            out_channels=3, base_features=base_features).to(device)
+    model = DeepONet_UNet3D(in_channels_branch=3, in_channels_trunk=3, out_channels=3, base_features=base_features).to(device)
     
     # 统计模型参数
     total_params = sum(p.numel() for p in model.parameters())
