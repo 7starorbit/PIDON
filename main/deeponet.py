@@ -4,8 +4,10 @@ from torch import nn
 class ConvBlock3D(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1):
         super(ConvBlock3D, self).__init__()
-        self.conv = nn.Conv3d(in_ch, out_ch, kernel_size, stride, padding)
-        self.bn = nn.BatchNorm3d(out_ch)
+        self.conv1 = nn.Conv3d(in_ch, out_ch, kernel_size, stride, padding)
+        self.conv2 = nn.Conv3d(out_ch, out_ch, kernel_size, stride, padding)
+        self.bn1 = nn.BatchNorm3d(out_ch)
+        self.bn2 = nn.BatchNorm3d(out_ch)
         self.gelu = nn.GELU()
         if in_ch != out_ch:
             self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.BatchNorm3d(out_ch))
@@ -15,11 +17,11 @@ class ConvBlock3D(nn.Module):
 
     def forward(self, x):
         residual = self.shortcut(x)
-        out = self.conv(x)
-        out = self.bn(out)
+        out = self.conv1(x)
+        out = self.bn1(out)
         out = self.gelu(out)
-        out = self.conv(out)
-        out = self.bn(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
         out += residual
         out = self.gelu(out)
         return out
@@ -48,7 +50,9 @@ class Encoder3D(nn.Module):
 
     def forward(self, x):
         features = []
-        features.append(layer(x) for layer in self.layers)
+        for layer in self.layers:
+            x = layer(x)
+            features.append(x)
         return features
     
 class Upsample3D(nn.Module):
@@ -68,8 +72,8 @@ class Decoder3D(nn.Module):
         super(Decoder3D, self).__init__()
         self.layers = nn.ModuleList()
         for i in range(num_layers-2, -1, -1):
-            out_ch = base_ch * (2 ** i)
-            self.layers.append(Upsample3D(out_ch * 2, out_ch))
+            ch = base_ch * (2 ** i)
+            self.layers.append(Upsample3D(ch * 2, ch))
         self.out_conv = nn.Conv3d(base_ch, out_ch, kernel_size=1, stride=1, padding=0)
 
     def forward(self, features):
@@ -81,12 +85,13 @@ class Decoder3D(nn.Module):
 class DeepONet3D(nn.Module):
     def __init__(self, in_ch=3, out_ch=3, base_ch=32, num_layers=4):
         super(DeepONet3D, self).__init__()
-        self.encoder = Encoder3D(in_ch, base_ch, num_layers)
+        self.trunk = Encoder3D(in_ch, base_ch, num_layers)
+        self.branch = Encoder3D(in_ch, base_ch, num_layers)
         self.decoder = Decoder3D(out_ch, base_ch, num_layers)
 
     def forward(self, E, r):
-        trunk_features = self.encoder(r)
-        branch_features = self.encoder(E)
+        trunk_features = self.trunk(r)
+        branch_features = self.branch(E)
         features = [tf * bf for tf, bf in zip(trunk_features, branch_features)]
         out = self.decoder(features)
         return out
