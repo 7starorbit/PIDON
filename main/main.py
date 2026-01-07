@@ -181,11 +181,13 @@ def main():
     print(f"  Test Loss: {checkpoint['test_loss']:.6f}")
     print(f"  Test MRE: {checkpoint['test_mre']:.6f}\n")
 
+    num_plot_samples = 4
+    indices = torch.randperm(len(test_dataset))[:num_plot_samples]
     # 可视化预测结果
-    visualize_results(model, test_dataset, device, num_samples=4)
+    visualize_results(model, test_dataset, device, num_samples=num_plot_samples, indices=indices)
     
     # 可视化误差分布
-    visualize_error_distribution(model, test_dataset, device, num_samples=4)
+    visualize_error_distribution(model, test_dataset, device, num_samples=num_plot_samples, indices=indices)
 
     print(f"\n{'='*70}")
     print("训练完成!")

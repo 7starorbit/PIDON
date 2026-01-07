@@ -3,14 +3,10 @@ import torch
 import matplotlib.pyplot as plt
 
 # ==================== 可视化函数 ====================
-def visualize_results(model, dataset, device, num_samples=4, save_dir='results'):
+def visualize_results(model, dataset, device, num_samples=4, indices=None, save_dir='results'):
     """可视化预测结果"""
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
-
-    # 获取归一化统计量
-    curl_mean = dataset.curl_mean
-    curl_std = dataset.curl_std
 
     fig, axes = plt.subplots(num_samples, 6, figsize=(18, 3*num_samples))
     if num_samples == 1:
@@ -18,14 +14,15 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
     
     with torch.no_grad():
         for i in range(num_samples):
-            E, r, curl_target = dataset[120+i]
+            E, r, curl_target = dataset[indices[i]]
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
             # 反归一化
-            curl_pred = curl_pred * curl_std.squeeze(0) + curl_mean.squeeze(0)
-            curl_target = curl_target * curl_std.squeeze(0) + curl_mean.squeeze(0)
+            if dataset.normalize:
+                curl_pred = curl_pred * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
+                curl_target = curl_target * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
             
             # 取中间切片
             z_mid = curl_target.shape[-1] // 2
@@ -56,13 +53,11 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
     print(f"可视化结果已保存到 {save_dir}/prediction_comparison.png")
 
 
-def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir='results'):
+def visualize_error_distribution(model, dataset, device, num_samples=4, indices=None, save_dir='results'):
     """可视化误差分布"""
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
-    curl_mean = dataset.curl_mean
-    curl_std = dataset.curl_std
     
     fig, axes = plt.subplots(num_samples, 3, figsize=(12, 3*num_samples))
     if num_samples == 1:
@@ -70,15 +65,16 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
     
     with torch.no_grad():
         for i in range(num_samples):
-            E, r, curl_target = dataset[120+i]
+            E, r, curl_target = dataset[indices[i]]
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
 
             # 反归一化
-            curl_pred = curl_pred * curl_std.squeeze(0) + curl_mean.squeeze(0)
-            curl_target = curl_target * curl_std.squeeze(0) + curl_mean.squeeze(0)
+            if dataset.normalize:
+                curl_pred = curl_pred * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
+                curl_target = curl_target * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
             
             # 计算误差
             error = torch.abs(curl_pred - curl_target)
