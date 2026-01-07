@@ -4,3 +4,5 @@ checkpoints
 curl.ipynb
 norm_stats.pth
 test.py
+train_stats.pth
+__pycache__/
