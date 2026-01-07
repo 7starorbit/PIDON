@@ -98,8 +98,8 @@ def main():
                 curl_pred = model(E, r)
 
                 if test_dataset.normalize:
-                    curl_pred = curl_pred * test_dataset.curl_std + test_dataset.curl_mean
-                    curl_target = curl_target * test_dataset.curl_std + test_dataset.curl_mean
+                    curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
+                    curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                 for i in range(curl_pred.shape[0]):
                     pred = curl_pred[i]
                     target = curl_target[i]
