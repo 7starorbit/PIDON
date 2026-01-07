@@ -41,6 +41,7 @@ def main():
 
     batch_size = 30
     num_epochs_adam = 100
+    num_epochs_lbfgs = 50
     lr_adam = 0.001
     base_features = 32
 
@@ -169,13 +170,95 @@ def main():
                 'test_mre': test_mre,
             }, 'checkpoints/best_model_adam.pth')
     
+
+    print("开始训练L-BFGS阶段...\n")
+
+    all_E = train_dataset.E.to(device)
+    all_r = train_dataset.r.to(device)
+    all_curl = train_dataset.curl.to(device)
+
+    optimizer_lbfgs = torch.optim.LBFGS(
+    model.parameters(), 
+    lr=1.0,               # L-BFGS 的学习率通常设为 1.0
+    max_iter=20,          # 每次调用的最大迭代次数
+    history_size=10,      # 存储的历史梯度数量
+    line_search_fn='strong_wolfe'  # 使用强 Wolfe 条件线搜索
+    )
+    for epoch in range(num_epochs_lbfgs):
+        model.train()
+        def closure():
+            optimizer_lbfgs.zero_grad()
+            curl_pred = model(all_E, all_r)
+            loss = criterion(curl_pred, all_curl)
+            loss.backward()
+            return loss
+        train_loss = optimizer_lbfgs.step(closure)
+
+        # 评估
+        model.eval()
+        test_loss = 0.0
+        with torch.no_grad():
+            for E, r, curl_target in test_loader:
+                E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+                curl_pred = model(E, r)
+                test_loss += criterion(curl_pred, curl_target).item()
+        test_loss /= len(test_loader)
+
+        # ===== 计算误差 =====
+        total_mre = 0.0
+        num_samples = 0
+        with torch.no_grad():
+            for E, r, curl_target in test_loader:
+                E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+
+                curl_pred = model(E, r)
+
+                if test_dataset.normalize:
+                    curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
+                    curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
+                for i in range(curl_pred.shape[0]):
+                    pred = curl_pred[i,2,:,:,:]
+                    target = curl_target[i,2,:,:,:]
+                    pred_flat = pred.flatten()
+                    target_flat = target.flatten()
+                    non_zero_mask = torch.abs(target_flat) > 1e-6
+                    n_non_zero = torch.sum(non_zero_mask).item()
+                    n_zero = torch.sum(~non_zero_mask).item()
+                    if n_non_zero > 0 and n_zero > 0:
+                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
+                    elif n_non_zero > 0:
+                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                        absolute_mre = 0.0
+                    else:
+                        relative_mre = 0.0
+                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
+                    total_mre += (relative_mre + absolute_mre).item()
+                    num_samples += 1
+        test_mre = total_mre / num_samples
+        
+        print(f"[L-BFGS] Epoch [{epoch+1}/{num_epochs_lbfgs}], "
+            f"Train Loss: {train_loss:.6f}, Test Loss: {test_loss:.6f}, Test MRE: {test_mre:.6f}")
+        
+        if test_loss < best_loss:
+            best_loss = test_loss
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer_lbfgs.state_dict(),
+                'train_loss': train_loss,
+                'test_loss': test_loss,
+                'test_mre': test_mre,
+            }, 'checkpoints/best_model_lbfgs.pth')
+
+
     # 绘制训练曲线
     print("\n训练完成，绘制训练曲线...")
     # plt.figure(figsize=(18,5))
 
     # 加载最佳模型并可视化
     print("加载最佳模型进行可视化...")
-    checkpoint = torch.load('checkpoints/best_model_adam.pth')
+    checkpoint = torch.load('checkpoints/best_model_lbfgs.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"最佳模型来自 Epoch {checkpoint['epoch']+1}")
     print(f"  Test Loss: {checkpoint['test_loss']:.6f}")
