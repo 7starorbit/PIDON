@@ -24,8 +24,8 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
             # 反归一化
-            curl_pred = curl_pred * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
-            curl_target = curl_target * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
+            curl_pred = curl_pred * curl_std.squeeze(0) + curl_mean.squeeze(0)
+            curl_target = curl_target * curl_std.squeeze(0) + curl_mean.squeeze(0)
             
             # 取中间切片
             z_mid = curl_target.shape[-1] // 2
@@ -70,15 +70,15 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, save_dir
     
     with torch.no_grad():
         for i in range(num_samples):
-            E, r, curl_target = dataset[i]
+            E, r, curl_target = dataset[4+i]
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
 
             # 反归一化
-            curl_pred = curl_pred * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
-            curl_target = curl_target * (curl_std.squeeze(0) + 1e-8) + curl_mean.squeeze(0)
+            curl_pred = curl_pred * curl_std.squeeze(0) + curl_mean.squeeze(0)
+            curl_target = curl_target * curl_std.squeeze(0) + curl_mean.squeeze(0)
             
             # 计算误差
             error = torch.abs(curl_pred - curl_target)
