@@ -101,8 +101,8 @@ def main():
                     curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                     curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                 for i in range(curl_pred.shape[0]):
-                    pred = curl_pred[i]
-                    target = curl_target[i]
+                    pred = curl_pred[i,2,:,:,:]
+                    target = curl_target[i,2,:,:,:]
                     pred_flat = pred.flatten()
                     target_flat = target.flatten()
                     non_zero_mask = torch.abs(target_flat) > 1e-6
