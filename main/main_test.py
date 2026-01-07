@@ -4,6 +4,7 @@ from deeponet import DeepONet3D
 from data import DCO_dataset
 from torch.utils.data import DataLoader
 import os
+import time
 import matplotlib.pyplot as plt
 from plot import visualize_results, visualize_error_distribution
 
@@ -155,7 +156,9 @@ def main():
     print(f"  Test MRE: {checkpoint['test_mre']:.6f}\n")
 
     num_plot_samples = 4
+    torch.manual_seed(int(time.time() * 1000) % (2**32))
     indices = torch.randperm(len(test_dataset))[:num_plot_samples]
+    print(f"随机选择的可视化样本索引: {indices.tolist()}")
     # 可视化预测结果
     visualize_results(model, test_dataset, device, num_samples=num_plot_samples, indices=indices)
     
