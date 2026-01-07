@@ -178,10 +178,8 @@ def main():
 
 
     print("开始训练L-BFGS阶段...\n")
-
-    all_E = train_dataset.E.to(device)
-    all_r = train_dataset.r.to(device)
-    all_curl = train_dataset.curl.to(device)
+    batch_size_lbfgs = 50
+    train_loader_lbfgs = DataLoader(train_dataset, batch_size=batch_size_lbfgs, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
 
     optimizer_lbfgs = torch.optim.LBFGS(
     model.parameters(), 
@@ -194,10 +192,14 @@ def main():
         model.train()
         def closure():
             optimizer_lbfgs.zero_grad()
-            curl_pred = model(all_E, all_r)
-            loss = criterion(curl_pred, all_curl)
-            loss.backward()
-            return loss
+            total_loss = 0.0
+            for E, r, curl_target in train_loader_lbfgs:
+                E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+                curl_pred = model(E, r)
+                loss = criterion(curl_pred, curl_target)
+                loss.backward()
+                total_loss += loss.item()
+            return total_loss / len(train_loader_lbfgs)
         train_loss = optimizer_lbfgs.step(closure)
 
         # 评估
