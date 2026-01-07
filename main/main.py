@@ -170,6 +170,12 @@ def main():
                 'test_mre': test_mre,
             }, 'checkpoints/best_model_adam.pth')
     
+    print("\n清理显存准备 L-BFGS 训练...")
+    del optimizer_adam  # 删除 Adam 优化器
+    torch.cuda.empty_cache()
+    import gc
+    gc.collect()
+
 
     print("开始训练L-BFGS阶段...\n")
 
