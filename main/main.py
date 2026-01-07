@@ -7,30 +7,30 @@ import os
 import matplotlib.pyplot as plt
 from plot import visualize_results, visualize_error_distribution
 
-def initialize_weights(model):
-    for name, module in model.named_modules():
-        if isinstance(module, (torch.nn.Conv3d, torch.nn.ConvTranspose3d)):
-            # GELU 的最佳初始化：Kaiming Normal with fan_in
-            # 使用 fan_in 模式可以更好地保持前向传播的方差
-            torch.nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
-            if module.bias is not None:
-                torch.nn.init.constant_(module.bias, 0)
+# def initialize_weights(model):
+#     for name, module in model.named_modules():
+#         if isinstance(module, (torch.nn.Conv3d, torch.nn.ConvTranspose3d)):
+#             # GELU 的最佳初始化：Kaiming Normal with fan_in
+#             # 使用 fan_in 模式可以更好地保持前向传播的方差
+#             torch.nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+#             if module.bias is not None:
+#                 torch.nn.init.constant_(module.bias, 0)
         
-        elif isinstance(module, torch.nn.BatchNorm3d):
-            # BatchNorm 标准初始化
-            torch.nn.init.constant_(module.weight, 1)
-            torch.nn.init.constant_(module.bias, 0)
+#         elif isinstance(module, torch.nn.BatchNorm3d):
+#             # BatchNorm 标准初始化
+#             torch.nn.init.constant_(module.weight, 1)
+#             torch.nn.init.constant_(module.bias, 0)
     
-    # 输出层使用小的初始化，让模型从接近0的输出开始学习
-    if hasattr(model, 'decoder') and hasattr(model.decoder, 'out_conv'):
-        torch.nn.init.xavier_normal_(model.decoder.out_conv.weight, gain=0.02)
-        if model.decoder.out_conv.bias is not None:
-            torch.nn.init.constant_(model.decoder.out_conv.bias, 0)
+#     # 输出层使用小的初始化，让模型从接近0的输出开始学习
+#     if hasattr(model, 'decoder') and hasattr(model.decoder, 'out_conv'):
+#         torch.nn.init.xavier_normal_(model.decoder.out_conv.weight, gain=0.02)
+#         if model.decoder.out_conv.bias is not None:
+#             torch.nn.init.constant_(model.decoder.out_conv.bias, 0)
     
-    print("✓ 模型参数初始化完成 (针对 GELU 优化)")
-    print("  - 卷积层: Kaiming Normal (mode='fan_in', 适合GELU)")
-    print("  - BatchNorm: weight=1, bias=0")
-    print("  - 输出层: Xavier Normal (gain=0.02, 小初始化)\n")
+#     print("✓ 模型参数初始化完成 (针对 GELU 优化)")
+#     print("  - 卷积层: Kaiming Normal (mode='fan_in', 适合GELU)")
+#     print("  - BatchNorm: weight=1, bias=0")
+#     print("  - 输出层: Xavier Normal (gain=0.02, 小初始化)\n")
 
 
 def main():
@@ -53,7 +53,7 @@ def main():
 
     print("初始化模型...")
     model = DeepONet3D(in_ch=3, out_ch=3, base_ch=base_features, num_layers=4).to(device)
-    initialize_weights(model)
+    # initialize_weights(model)
 
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     branch_params = sum(p.numel() for name, p in model.named_parameters() if p.requires_grad and 'branch' in name)
