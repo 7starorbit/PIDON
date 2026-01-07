@@ -149,7 +149,7 @@ def main():
 
     # 加载最佳模型并可视化
     print("加载最佳模型进行可视化...")
-    checkpoint = torch.load('checkpoints/best_model_adam.pth')
+    checkpoint = torch.load('checkpoints/best_model_lbfgs.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"最佳模型来自 Epoch {checkpoint['epoch']+1}")
     print(f"  Test Loss: {checkpoint['test_loss']:.6f}")
