@@ -18,7 +18,7 @@ def visualize_results(model, dataset, device, num_samples=4, save_dir='results')
     
     with torch.no_grad():
         for i in range(num_samples):
-            E, r, curl_target = dataset[i]
+            E, r, curl_target = dataset[4+i]
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
