@@ -76,13 +76,19 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, indices=
                 curl_pred = curl_pred * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
                 curl_target = curl_target * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
             
-            # 计算误差
+            # 计算误差 - 使用更鲁棒的相对误差指标
             eps = 1e-6
             abs_error = torch.abs(curl_pred - curl_target)
-            rel_error = abs_error / (torch.abs(curl_target) + eps)
-
-            mask = torch.abs(curl_target) > eps
-            error = torch.where(mask, rel_error, abs_error)
+            
+            # 方法1: 使用最大值归一化的相对误差
+            target_max = torch.abs(curl_target).max(dim=-1, keepdim=True)[0].max(dim=-2, keepdim=True)[0].max(dim=-3, keepdim=True)[0]
+            error = abs_error / (target_max + eps)
+            
+            # 方法2: 混合误差 - 对大值用相对误差,小值用绝对误差
+            # threshold = torch.abs(curl_target).max() * 0.1  # 10%阈值
+            # rel_error = abs_error / (torch.abs(curl_target) + eps)
+            # mask = torch.abs(curl_target) > threshold
+            # error = torch.where(mask, rel_error, abs_error)
             
             z_mid = error.shape[-1] // 2
             
