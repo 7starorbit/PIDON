@@ -46,8 +46,8 @@ def main():
     base_features = 32
 
     print("加载数据集...")
-    train_dataset = DCO_dataset(mode='train', normalize=False)
-    test_dataset = DCO_dataset(mode='test', normalize=False)
+    train_dataset = DCO_dataset(mode='train', normalize=True)
+    test_dataset = DCO_dataset(mode='test', normalize=True)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=0, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
