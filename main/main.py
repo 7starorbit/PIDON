@@ -40,7 +40,7 @@ def main():
     print(f'Using device: {device}')
 
     batch_size = 30
-    num_epochs_adam = 1000
+    num_epochs_adam = 100
     num_epochs_lbfgs = 50
     lr_adam = 0.001
     base_features = 32
