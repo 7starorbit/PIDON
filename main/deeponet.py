@@ -6,11 +6,11 @@ class ConvBlock3D(nn.Module):
         super(ConvBlock3D, self).__init__()
         self.conv1 = nn.Conv3d(in_ch, out_ch, kernel_size, stride, padding)
         self.conv2 = nn.Conv3d(out_ch, out_ch, kernel_size, stride, padding)
-        self.bn1 = nn.BatchNorm3d(out_ch)
-        self.bn2 = nn.BatchNorm3d(out_ch)
+        self.bn1 = nn.InstanceNorm3d(out_ch)
+        self.bn2 = nn.InstanceNorm3d(out_ch)
         self.gelu = nn.GELU()
         if in_ch != out_ch:
-            self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.BatchNorm3d(out_ch))
+            self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.InstanceNorm3d(out_ch))
         else:
             self.shortcut = nn.Identity()
 

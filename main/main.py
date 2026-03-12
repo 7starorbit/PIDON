@@ -40,14 +40,14 @@ def main():
     print(f'Using device: {device}')
 
     batch_size = 30
-    num_epochs_adam = 100
+    num_epochs_adam = 1000
     num_epochs_lbfgs = 50
     lr_adam = 0.001
     base_features = 32
 
     print("加载数据集...")
-    train_dataset = DCO_dataset(mode='train', normalize=True)
-    test_dataset = DCO_dataset(mode='test', normalize=True)
+    train_dataset = DCO_dataset(mode='train', normalize=False)
+    test_dataset = DCO_dataset(mode='test', normalize=False)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=0, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
@@ -97,7 +97,12 @@ def main():
 
             optimizer_adam.zero_grad()
             curl_pred = model(E, r)
-            loss = criterion(curl_pred, curl_target)
+
+            # 输出数据根据不同样本不同通道最大值归一化计算loss
+            max_target = curl_target.abs().flatten(2).max(dim=2).values.clamp(min=1e-6).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+            curl_pred_norm = curl_pred / max_target
+            curl_target_norm = curl_target / max_target
+            loss = criterion(curl_pred_norm, curl_target_norm)
             loss.backward()
             optimizer_adam.step()
 
@@ -112,7 +117,12 @@ def main():
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
 
                 curl_pred = model(E, r)
-                loss = criterion(curl_pred, curl_target)
+
+                # 输出数据根据不同样本不同通道最大值归一化计算loss
+                max_target = curl_target.abs().flatten(2).max(dim=2).values.clamp(min=1e-6).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+                curl_pred_norm = curl_pred / max_target
+                curl_target_norm = curl_target / max_target
+                loss = criterion(curl_pred_norm, curl_target_norm)
                 test_loss += loss.item()
             test_loss /= len(test_loader)
 
@@ -137,15 +147,14 @@ def main():
                     n_non_zero = torch.sum(non_zero_mask).item()
                     n_zero = torch.sum(~non_zero_mask).item()
                     if n_non_zero > 0 and n_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
+                        relative_sum = torch.sum(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                        absolute_sum = torch.sum(torch.abs(pred_flat[~non_zero_mask]))
+                        mre = (relative_sum + absolute_sum) / (n_non_zero + n_zero)
                     elif n_non_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = 0.0
+                        mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
                     else:
-                        relative_mre = 0.0
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
-                    total_mre += (relative_mre + absolute_mre).item()
+                        mre = torch.mean(torch.abs(pred_flat))
+                    total_mre += mre.item()
                     num_samples += 1
         test_mre = total_mre / num_samples
 
