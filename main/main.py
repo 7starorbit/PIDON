@@ -200,20 +200,24 @@ def main():
     )
     for epoch in range(num_epochs_lbfgs):
         model.train()
-        def closure():
-            optimizer_lbfgs.zero_grad()
-            total_loss = 0.0
-            for E, r, curl_target in train_loader_lbfgs:
-                E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+        train_loss = 0.0
+        for E, r, curl_target in train_loader_lbfgs:
+            E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+
+            def closure():
+                optimizer_lbfgs.zero_grad()
                 curl_pred = model(E, r)
                 max_target = curl_target.abs().flatten(2).max(dim=2).values.clamp(min=1e-6).unsqueeze(2).unsqueeze(3).unsqueeze(4)
                 curl_pred_norm = curl_pred / max_target
                 curl_target_norm = curl_target / max_target
                 loss = criterion(curl_pred_norm, curl_target_norm)
                 loss.backward()
-                total_loss += loss.item()
-            return total_loss / len(train_loader_lbfgs)
-        train_loss = optimizer_lbfgs.step(closure)
+                return loss
+
+            loss = optimizer_lbfgs.step(closure)
+            train_loss += loss.item()
+
+        train_loss /= len(train_loader_lbfgs)
 
         # 评估
         model.eval()
