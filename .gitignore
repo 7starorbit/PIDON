@@ -9,3 +9,4 @@ __pycache__/
 main/results/
 best_model_lbfgs.pth
 .vscode/
+chat.md
