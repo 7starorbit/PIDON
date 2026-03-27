@@ -8,6 +8,10 @@ def visualize_results(model, dataset, device, num_samples=4, indices=None, save_
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
+    if indices is None:
+        num_samples = min(num_samples, len(dataset))
+        indices = torch.arange(num_samples)
+    
     fig, axes = plt.subplots(num_samples, 6, figsize=(18, 3*num_samples))
     if num_samples == 1:
         axes = axes.reshape(1, -1)
@@ -58,6 +62,9 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, indices=
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
+    if indices is None:
+        num_samples = min(num_samples, len(dataset))
+        indices = torch.arange(num_samples)
     
     fig, axes = plt.subplots(num_samples, 3, figsize=(12, 3*num_samples))
     if num_samples == 1:

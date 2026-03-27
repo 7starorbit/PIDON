@@ -129,24 +129,24 @@ def main():
                     curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                     curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                 for i in range(curl_pred.shape[0]):
-                    pred = curl_pred[i,2,:,:,:]
-                    target = curl_target[i,2,:,:,:]
-                    pred_flat = pred.flatten()
-                    target_flat = target.flatten()
-                    non_zero_mask = torch.abs(target_flat) > 1e-6
-                    n_non_zero = torch.sum(non_zero_mask).item()
-                    n_zero = torch.sum(~non_zero_mask).item()
-                    if n_non_zero > 0 and n_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
-                    elif n_non_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = 0.0
-                    else:
-                        relative_mre = 0.0
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
-                    total_mre += (relative_mre + absolute_mre).item()
-                    num_samples += 1
+                    for channel in range(3):
+                        pred = curl_pred[i,channel,:,:,:]
+                        target = curl_target[i,channel,:,:,:]
+                        pred_flat = pred.flatten()
+                        target_flat = target.flatten()
+                        non_zero_mask = torch.abs(target_flat) > 1e-6
+                        n_non_zero = torch.sum(non_zero_mask).item()
+                        n_zero = torch.sum(~non_zero_mask).item()
+                        if n_non_zero > 0 and n_zero > 0:
+                            relative_sum = torch.sum(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                            absolute_sum = torch.sum(torch.abs(pred_flat[~non_zero_mask]))
+                            mre = (relative_sum + absolute_sum) / (n_non_zero + n_zero)
+                        elif n_non_zero > 0:
+                            mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                        else:
+                            mre = torch.mean(torch.abs(pred_flat))
+                        total_mre += mre.item()
+                        num_samples += 1
         test_mre = total_mre / num_samples
 
         history['train_loss'].append(train_loss)
@@ -190,17 +190,18 @@ def main():
     )
     for epoch in range(num_epochs_lbfgs):
         model.train()
-        def closure():
-            optimizer_lbfgs.zero_grad()
-            total_loss = 0.0
-            for E, r, curl_target in train_loader_lbfgs:
-                E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+        train_loss = 0.0
+        for E, r, curl_target in train_loader_lbfgs:
+            E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
+            def closure():
+                optimizer_lbfgs.zero_grad()
                 curl_pred = model(E, r)
                 loss = criterion(curl_pred, curl_target)
                 loss.backward()
-                total_loss += loss.item()
-            return total_loss / len(train_loader_lbfgs)
-        train_loss = optimizer_lbfgs.step(closure)
+                return loss
+            loss = optimizer_lbfgs.step(closure)
+            train_loss += loss.item()
+        train_loss /= len(train_loader_lbfgs)
 
         # 评估
         model.eval()
@@ -225,24 +226,24 @@ def main():
                     curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                     curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
                 for i in range(curl_pred.shape[0]):
-                    pred = curl_pred[i,2,:,:,:]
-                    target = curl_target[i,2,:,:,:]
-                    pred_flat = pred.flatten()
-                    target_flat = target.flatten()
-                    non_zero_mask = torch.abs(target_flat) > 1e-6
-                    n_non_zero = torch.sum(non_zero_mask).item()
-                    n_zero = torch.sum(~non_zero_mask).item()
-                    if n_non_zero > 0 and n_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
-                    elif n_non_zero > 0:
-                        relative_mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
-                        absolute_mre = 0.0
-                    else:
-                        relative_mre = 0.0
-                        absolute_mre = torch.mean(torch.abs(pred_flat[~non_zero_mask]))
-                    total_mre += (relative_mre + absolute_mre).item()
-                    num_samples += 1
+                    for channel in range(3):
+                        pred = curl_pred[i,channel,:,:,:]
+                        target = curl_target[i,channel,:,:,:]
+                        pred_flat = pred.flatten()
+                        target_flat = target.flatten()
+                        non_zero_mask = torch.abs(target_flat) > 1e-6
+                        n_non_zero = torch.sum(non_zero_mask).item()
+                        n_zero = torch.sum(~non_zero_mask).item()
+                        if n_non_zero > 0 and n_zero > 0:
+                            relative_sum = torch.sum(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                            absolute_sum = torch.sum(torch.abs(pred_flat[~non_zero_mask]))
+                            mre = (relative_sum + absolute_sum) / (n_non_zero + n_zero)
+                        elif n_non_zero > 0:
+                            mre = torch.mean(torch.abs(pred_flat[non_zero_mask] - target_flat[non_zero_mask]) / torch.abs(target_flat[non_zero_mask]))
+                        else:
+                            mre = torch.mean(torch.abs(pred_flat))
+                        total_mre += mre.item()
+                        num_samples += 1
         test_mre = total_mre / num_samples
         
         print(f"[L-BFGS] Epoch [{epoch+1}/{num_epochs_lbfgs}], "
