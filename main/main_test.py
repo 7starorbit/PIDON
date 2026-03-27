@@ -13,10 +13,7 @@ def main():
     torch.manual_seed(1234)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
-
-    batch_size = 30
-    num_epochs_adam = 100
-    lr_adam = 0.001
+    
     base_features = 32
 
     print("加载数据集...")

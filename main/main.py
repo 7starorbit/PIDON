@@ -39,8 +39,8 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
 
-    batch_size = 30
-    num_epochs_adam = 100
+    batch_size = 1
+    num_epochs_adam = 1000
     num_epochs_lbfgs = 50
     lr_adam = 0.001
     base_features = 32
@@ -178,7 +178,7 @@ def main():
 
 
     print("开始训练L-BFGS阶段...\n")
-    batch_size_lbfgs = 50
+    batch_size_lbfgs = 1
     train_loader_lbfgs = DataLoader(train_dataset, batch_size=batch_size_lbfgs, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
 
     optimizer_lbfgs = torch.optim.LBFGS(
