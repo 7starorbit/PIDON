@@ -39,15 +39,15 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
 
-    batch_size = 1
-    num_epochs_adam = 1000
+    batch_size = 16
+    num_epochs_adam = 2000
     num_epochs_lbfgs = 50
-    lr_adam = 0.001
+    lr_adam = 0.0001
     base_features = 32
 
     print("加载数据集...")
     train_dataset = DCO_dataset(mode='train', normalize=True)
-    test_dataset = DCO_dataset(mode='test', normalize=True)
+    test_dataset = DCO_dataset(mode='test', normalize=False)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=0, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
@@ -109,6 +109,10 @@ def main():
         test_loss = 0.0
         with torch.no_grad():
             for E, r, curl_target in test_loader:
+                E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+                E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+                E = (E - E_mean) / (E_std + 1e-8)
+                curl_target = curl_target / (E_std + 1e-8)
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
 
                 curl_pred = model(E, r)
@@ -121,20 +125,23 @@ def main():
         num_samples = 0
         with torch.no_grad():
             for E, r, curl_target in test_loader:
+                E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+                E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+                E = (E - E_mean) / (E_std + 1e-8)
+
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
 
                 curl_pred = model(E, r)
 
                 if test_dataset.normalize:
-                    curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
-                    curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
+                    curl_pred = curl_pred * E.std.to(device)
                 for i in range(curl_pred.shape[0]):
                     for channel in range(3):
                         pred = curl_pred[i,channel,:,:,:]
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-6
+                        non_zero_mask = torch.abs(target_flat) > 1e-4
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
@@ -178,7 +185,7 @@ def main():
 
 
     print("开始训练L-BFGS阶段...\n")
-    batch_size_lbfgs = 1
+    batch_size_lbfgs = 16
     train_loader_lbfgs = DataLoader(train_dataset, batch_size=batch_size_lbfgs, shuffle=False, drop_last=False, num_workers=0, pin_memory=True)
 
     optimizer_lbfgs = torch.optim.LBFGS(
@@ -208,6 +215,10 @@ def main():
         test_loss = 0.0
         with torch.no_grad():
             for E, r, curl_target in test_loader:
+                E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+                E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+                E = (E - E_mean) / (E_std + 1e-8)
+                curl_target = curl_target / (E_std + 1e-8)
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
                 curl_pred = model(E, r)
                 test_loss += criterion(curl_pred, curl_target).item()
@@ -218,20 +229,23 @@ def main():
         num_samples = 0
         with torch.no_grad():
             for E, r, curl_target in test_loader:
+                E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+                E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+                E = (E - E_mean) / (E_std + 1e-8)
+
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
 
                 curl_pred = model(E, r)
 
                 if test_dataset.normalize:
-                    curl_pred = curl_pred * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
-                    curl_target = curl_target * test_dataset.curl_std.to(device) + test_dataset.curl_mean.to(device)
+                    curl_pred = curl_pred * E.std.to(device)
                 for i in range(curl_pred.shape[0]):
                     for channel in range(3):
                         pred = curl_pred[i,channel,:,:,:]
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-6
+                        non_zero_mask = torch.abs(target_flat) > 1e-4
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:

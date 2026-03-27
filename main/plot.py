@@ -19,14 +19,15 @@ def visualize_results(model, dataset, device, num_samples=4, indices=None, save_
     with torch.no_grad():
         for i in range(num_samples):
             E, r, curl_target = dataset[indices[i]]
+            E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+            E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+            E = (E - E_mean) / (E_std + 1e-8)
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
-            # 反归一化
-            if dataset.normalize:
-                curl_pred = curl_pred * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
-                curl_target = curl_target * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
+
+            curl_pred = curl_pred * E_std.squeeze(0)
             
             # 取中间切片
             z_mid = curl_target.shape[-1] // 2
@@ -73,22 +74,22 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, indices=
     with torch.no_grad():
         for i in range(num_samples):
             E, r, curl_target = dataset[indices[i]]
+            E_mean = torch.mean(E, dim=(1,2,3,4), keepdim=True)
+            E_std = torch.std(E, dim=(1,2,3,4), keepdim=True)
+            E = (E - E_mean) / (E_std + 1e-8)
+
             E = E.unsqueeze(0).to(device)
             r = r.unsqueeze(0).to(device)
             curl_pred = model(E, r).cpu().squeeze(0)
             curl_target = curl_target.cpu()
 
-            # 反归一化
-            if dataset.normalize:
-                curl_pred = curl_pred * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
-                curl_target = curl_target * dataset.curl_std.squeeze(0) + dataset.curl_mean.squeeze(0)
-            
+            curl_pred = curl_pred * E_std.squeeze(0)
+        
             # 计算误差
-            eps = 1e-6
-            abs_error = torch.abs(curl_pred - curl_target)
-            rel_error = abs_error / (torch.abs(curl_target) + eps)
+            abs_error = torch.abs(curl_pred)
+            rel_error = torch.abs(curl_pred - curl_target) / torch.abs(curl_target)
 
-            mask = torch.abs(curl_target) > eps
+            mask = torch.abs(curl_target) > 1e-4
             error = torch.where(mask, rel_error, abs_error)
             
             z_mid = error.shape[-1] // 2

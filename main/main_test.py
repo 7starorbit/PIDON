@@ -13,19 +13,19 @@ def main():
     torch.manual_seed(1234)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
-    
+
     base_features = 32
 
     print("加载数据集...")
     train_dataset = DCO_dataset(mode='train', normalize=True)
-    test_dataset = DCO_dataset(mode='test', normalize=True)
+    test_dataset = DCO_dataset(mode='test', normalize=False)
 
     print("初始化模型...")
     model = DeepONet3D(in_ch=3, out_ch=3, base_ch=base_features, num_layers=4).to(device)
 
     # 加载最佳模型并可视化
     print("加载最佳模型进行可视化...")
-    checkpoint = torch.load('checkpoints/best_model_lbfgs.pth')
+    checkpoint = torch.load('checkpoints/best_model_adam.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f"最佳模型来自 Epoch {checkpoint['epoch']+1}")
     print(f"  Test Loss: {checkpoint['test_loss']:.6f}")

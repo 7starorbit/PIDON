@@ -31,32 +31,14 @@ class DCO_dataset(Dataset):
 
         if self.normalize:
             if self.mode == 'train':
-                self.E_mean = torch.mean(self.E, dim=(0,2,3,4), keepdim=True)
-                self.E_std = torch.std(self.E, dim=(0,2,3,4), keepdim=True)
-                self.curl_mean = torch.mean(self.curl, dim=(0,2,3,4), keepdim=True)
-                self.curl_std = torch.std(self.curl, dim=(0,2,3,4), keepdim=True)
-                # self.r_mean = torch.mean(self.r, dim=(0,2,3,4), keepdim=True)
-                # self.r_std = torch.std(self.r, dim=(0,2,3,4), keepdim=True)
-                torch.save({
-                    'E_mean': self.E_mean,
-                    'E_std': self.E_std,
-                    'curl_mean': self.curl_mean,
-                    'curl_std': self.curl_std,
-                    # 'r_mean': self.r_mean,
-                    # 'r_std': self.r_std
-                }, os.path.join('./', 'train_stats.pth'))
-            else:
-                norm_stats = torch.load(os.path.join('./', 'train_stats.pth'))
-                self.E_mean = norm_stats['E_mean']
-                self.E_std = norm_stats['E_std']
-                self.curl_mean = norm_stats['curl_mean']
-                self.curl_std = norm_stats['curl_std']
-                # self.r_mean = norm_stats['r_mean']
-                # self.r_std = norm_stats['r_std']
-            self.E = (self.E - self.E_mean) / self.E_std
-            self.curl = (self.curl - self.curl_mean) / self.curl_std
-            # self.r = (self.r - self.r_mean) / self.r_std
-    
+                self.E_mean = torch.mean(self.E, dim=(1,2,3,4), keepdim=True)
+                self.E_std = torch.std(self.E, dim=(1,2,3,4), keepdim=True)
+                # self.r_mean = torch.mean(self.r, dim=(1,2,3,4), keepdim=True)
+                # self.r_std = torch.std(self.r, dim=(1,2,3,4), keepdim=True)
+                self.E = (self.E - self.E_mean) / (self.E_std + 1e-8)
+                self.curl = self.curl / (self.E_std + 1e-8)
+                # self.r = (self.r - self.r_mean) / self.r_std
+        
     def __len__(self):
         return self.n_samples
     
