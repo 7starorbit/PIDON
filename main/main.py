@@ -97,7 +97,10 @@ def main():
 
             optimizer_adam.zero_grad()
             curl_pred = model(E, r)
-            loss = criterion(curl_pred, curl_target)
+            max_target = curl_target.abs().flatten(2).max(dim=2).values.clamp(min=1e-6).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+            curl_pred_norm = curl_pred / max_target
+            curl_target_norm = curl_target / max_target
+            loss = criterion(curl_pred_norm, curl_target_norm)
             loss.backward()
             optimizer_adam.step()
 
@@ -116,7 +119,10 @@ def main():
                 E, r, curl_target = E.to(device), r.to(device), curl_target.to(device)
 
                 curl_pred = model(E, r)
-                loss = criterion(curl_pred, curl_target)
+                max_target = curl_target.abs().flatten(2).max(dim=2).values.clamp(min=1e-6).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+                curl_pred_norm = curl_pred / max_target
+                curl_target_norm = curl_target / max_target
+                loss = criterion(curl_pred_norm, curl_target_norm)
                 test_loss += loss.item()
             test_loss /= len(test_loader)
 
