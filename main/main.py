@@ -140,7 +140,7 @@ def main():
                 curl_pred = model(E, r)
 
                 if test_dataset.normalize:
-                    curl_pred = curl_pred * (E.std.to(device) + 1e-7) / (r.std.to(device) + 1e-7)
+                    curl_pred = curl_pred * (E_std.to(device) + 1e-7) / (r_std.to(device) + 1e-7)
                 for i in range(curl_pred.shape[0]):
                     for channel in range(3):
                         pred = curl_pred[i,channel,:,:,:]
