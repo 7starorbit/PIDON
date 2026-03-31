@@ -2,28 +2,42 @@ import torch
 from torch import nn
 
 class ConvBlock3D(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1):
+    def __init__(self, in_ch, out_ch, kernel_size=3, stride=1, padding=1, use_bn=True, use_gelu=True, use_residual=True):
         super(ConvBlock3D, self).__init__()
+        self.use_residual = use_residual
         self.conv1 = nn.Conv3d(in_ch, out_ch, kernel_size, stride, padding)
         self.conv2 = nn.Conv3d(out_ch, out_ch, kernel_size, stride, padding)
-        self.bn1 = nn.BatchNorm3d(out_ch)
-        self.bn2 = nn.BatchNorm3d(out_ch)
-        self.gelu = nn.GELU()
-        if in_ch != out_ch:
-            self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.BatchNorm3d(out_ch))
+        if use_gelu:
+            self.act = nn.GELU()
         else:
-            self.shortcut = nn.Identity()
+            self.act = nn.ReLU()
+        if use_bn:
+            self.norm1 = nn.BatchNorm3d(out_ch)
+            self.norm2 = nn.BatchNorm3d(out_ch)
+            if in_ch != out_ch:
+                self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.BatchNorm3d(out_ch))
+            else:
+                self.shortcut = nn.Identity()
+        else:
+            self.norm1 = nn.GroupNorm(min(8, out_ch), out_ch)
+            self.norm2 = nn.GroupNorm(min(8, out_ch), out_ch)
+            if in_ch != out_ch:
+                self.shortcut = nn.Sequential(nn.Conv3d(in_ch, out_ch, kernel_size=1, stride=1, padding=0), nn.GroupNorm(min(8, out_ch), out_ch))
+            else:
+                self.shortcut = nn.Identity()
 
 
     def forward(self, x):
-        residual = self.shortcut(x)
+        if self.use_residual:
+            residual = self.shortcut(x)
         out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.gelu(out)
+        out = self.norm1(out)
+        out = self.act(out)
         out = self.conv2(out)
-        out = self.bn2(out)
-        out += residual
-        out = self.gelu(out)
+        out = self.norm2(out)
+        if self.use_residual:
+            out += residual
+        out = self.act(out)
         return out
 
 class Downsample3D(nn.Module):

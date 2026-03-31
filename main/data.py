@@ -29,15 +29,14 @@ class DCO_dataset(Dataset):
         print(f"  curl shape: {self.curl.shape}")
         print(f"  r shape: {self.r.shape}")
 
-        if self.normalize:
-            if self.mode == 'train':
-                self.E_mean = torch.mean(self.E, dim=(1,2,3,4), keepdim=True)
-                self.E_std = torch.std(self.E, dim=(1,2,3,4), keepdim=True)
-                # self.r_mean = torch.mean(self.r, dim=(1,2,3,4), keepdim=True)
-                # self.r_std = torch.std(self.r, dim=(1,2,3,4), keepdim=True)
-                self.E = (self.E - self.E_mean) / (self.E_std + 1e-8)
-                self.curl = self.curl / (self.E_std + 1e-8)
-                # self.r = (self.r - self.r_mean) / self.r_std
+        if self.normalize and self.mode == 'train':
+            self.E_mean = torch.mean(self.E, dim=(1,2,3,4), keepdim=True)
+            self.E_std = torch.std(self.E, dim=(1,2,3,4), keepdim=True)
+            self.r_mean = torch.mean(self.r, dim=(1,2,3,4), keepdim=True)
+            self.r_std = torch.std(self.r, dim=(1,2,3,4), keepdim=True)
+            self.E = (self.E - self.E_mean) / (self.E_std + 1e-7)
+            self.r = (self.r - self.r_mean) / (self.r_std + 1e-7)
+            self.curl = self.curl * (self.r_std + 1e-7) / (self.E_std + 1e-7)
         
     def __len__(self):
         return self.n_samples

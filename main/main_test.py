@@ -18,7 +18,7 @@ def main():
 
     print("加载数据集...")
     train_dataset = DCO_dataset(mode='train', normalize=True)
-    test_dataset = DCO_dataset(mode='test', normalize=False)
+    test_dataset = DCO_dataset(mode='test', normalize=True)
 
     print("初始化模型...")
     model = DeepONet3D(in_ch=3, out_ch=3, base_ch=base_features, num_layers=4).to(device)
