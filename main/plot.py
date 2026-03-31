@@ -38,18 +38,21 @@ def visualize_results(model, dataset, device, num_samples=4, indices=None, save_
             # 绘制三个分量的真实值和预测值
             comp_names = ['x', 'y', 'z']
             for comp in range(3):
+                true_slice = curl_target[comp, :, :, z_mid].numpy()
+                pred_slice = curl_pred[comp, :, :, z_mid].numpy()
+
+                vmin = min(true_slice.min(), pred_slice.min())
+                vmax = max(true_slice.max(), pred_slice.max())
                 # 真实值
                 ax = axes[i, comp]
-                true_slice = curl_target[comp, :, :, z_mid].numpy()
-                im = ax.imshow(true_slice, cmap='RdBu_r')
+                im = ax.imshow(true_slice, cmap='RdBu_r', vmin=vmin, vmax=vmax)
                 ax.set_title(f'Sample {i+1}: True ∇×E_{comp_names[comp]}')
                 ax.axis('off')
                 plt.colorbar(im, ax=ax, fraction=0.046)
                 
                 # 预测值
                 ax = axes[i, comp+3]
-                pred_slice = curl_pred[comp, :, :, z_mid].numpy()
-                im = ax.imshow(pred_slice, cmap='RdBu_r')
+                im = ax.imshow(pred_slice, cmap='RdBu_r', vmin=vmin, vmax=vmax)
                 ax.set_title(f'Sample {i+1}: Pred ∇×E_{comp_names[comp]}')
                 ax.axis('off')
                 plt.colorbar(im, ax=ax, fraction=0.046)
