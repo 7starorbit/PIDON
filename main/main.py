@@ -149,7 +149,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-4
+                        non_zero_mask = torch.abs(target_flat) > 1e-2
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
@@ -259,7 +259,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-4
+                        non_zero_mask = torch.abs(target_flat) > 1e-2
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
