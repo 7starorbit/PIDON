@@ -87,6 +87,7 @@ def main():
 
     print("开始训练Adam阶段...\n")
     optimizer_adam = torch.optim.Adam(model.parameters(), lr=lr_adam)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_adam, T_max=100)
 
     for epoch in range(num_epochs_adam):
         # ===== 训练阶段 =====
@@ -100,6 +101,7 @@ def main():
             loss = criterion(curl_pred, curl_target)
             loss.backward()
             optimizer_adam.step()
+            scheduler.step()
 
             train_loss += loss.item()
         train_loss /= len(train_loader)
@@ -147,7 +149,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-7
+                        non_zero_mask = torch.abs(target_flat) > 1e-4
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
@@ -257,7 +259,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-7
+                        non_zero_mask = torch.abs(target_flat) > 1e-4
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
