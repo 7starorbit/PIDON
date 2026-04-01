@@ -86,14 +86,14 @@ def main():
     os.makedirs('checkpoints', exist_ok=True)
 
     print("开始训练Adam阶段...\n")
-    optimizer_adam = torch.optim.AdamW(model.parameters(), lr=lr_adam, weight_decay=1e-5)
+    optimizer_adam = torch.optim.AdamW(model.parameters(), lr=lr_adam)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_adam, T_max=50, eta_min=1e-6)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer_adam,
     mode='min',
     factor=0.5,
     patience=40,
-    min_lr=1e-6
+    min_lr=1e-8
 )
 
     for epoch in range(num_epochs_adam):
@@ -157,7 +157,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-2
+                        non_zero_mask = torch.abs(target_flat) > 1e-1
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:
@@ -267,7 +267,7 @@ def main():
                         target = curl_target[i,channel,:,:,:]
                         pred_flat = pred.flatten()
                         target_flat = target.flatten()
-                        non_zero_mask = torch.abs(target_flat) > 1e-2
+                        non_zero_mask = torch.abs(target_flat) > 1e-1
                         n_non_zero = torch.sum(non_zero_mask).item()
                         n_zero = torch.sum(~non_zero_mask).item()
                         if n_non_zero > 0 and n_zero > 0:

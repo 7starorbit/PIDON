@@ -99,7 +99,7 @@ def visualize_error_distribution(model, dataset, device, num_samples=4, indices=
             abs_error = torch.abs(curl_pred)
             rel_error = torch.abs(curl_pred - curl_target) / torch.abs(curl_target)
 
-            mask = torch.abs(curl_target) > 1e-2
+            mask = torch.abs(curl_target) > 1e-1
             error = torch.where(mask, rel_error, abs_error)
             
             z_mid = error.shape[-1] // 2
@@ -154,7 +154,7 @@ def plot_true_vs_rel_error(model, dataset, device, num_samples=4, indices=None, 
                 for comp in range(3):
                     t = curl_target[comp].reshape(-1).numpy()
                     p = curl_pred[comp].reshape(-1).numpy()
-                    rel = np.where(np.abs(t) > 1e-2, np.abs(p - t) / np.abs(t), np.abs(p))
+                    rel = np.where(np.abs(t) > 1e-1, np.abs(p - t) / np.abs(t), np.abs(p))
                     true_vals[comp].append(t)
                     rel_vals[comp].append(rel)
             else:  # 'slice'
@@ -162,7 +162,7 @@ def plot_true_vs_rel_error(model, dataset, device, num_samples=4, indices=None, 
                 for comp in range(3):
                     t = curl_target[comp, :, :, z].numpy().ravel()
                     p = curl_pred[comp, :, :, z].numpy().ravel()
-                    rel = np.where(np.abs(t) > 1e-2, np.abs(p - t) / np.abs(t), np.abs(p))
+                    rel = np.where(np.abs(t) > 1e-1, np.abs(p - t) / np.abs(t), np.abs(p))
                     true_vals[comp].append(t)
                     rel_vals[comp].append(rel)
 

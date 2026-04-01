@@ -41,7 +41,7 @@ def main():
     # 可视化误差分布
     visualize_error_distribution(model, test_dataset, device, num_samples=num_plot_samples, indices=indices)
     # 可视化真实值与相对误差的关系
-    plot_true_vs_rel_error(model, test_dataset, device, num_samples=num_plot_samples, indices=indices, mode='slice')
+    plot_true_vs_rel_error(model, test_dataset, device, num_samples=num_plot_samples, indices=indices, mode='all')
 
 
     print(f"\n{'='*70}")
