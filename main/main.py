@@ -92,7 +92,7 @@ def main():
     optimizer_adam,
     mode='min',
     factor=0.5,
-    patience=100,
+    patience=40,
     min_lr=1e-6
 )
 
@@ -108,11 +108,11 @@ def main():
             loss = criterion(curl_pred, curl_target)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            optimizer_adam.step()
             scheduler.step()
 
             train_loss += loss.item()
         train_loss /= len(train_loader)
+        scheduler.step(train_loss)
 
         # ===== 测试阶段 =====
         model.eval()
