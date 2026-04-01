@@ -87,7 +87,7 @@ def main():
 
     print("开始训练Adam阶段...\n")
     optimizer_adam = torch.optim.AdamW(model.parameters(), lr=lr_adam, weight_decay=1e-5)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_adam, T_max=100)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_adam, T_max=50, eta_min=1e-6)
 
     for epoch in range(num_epochs_adam):
         # ===== 训练阶段 =====
