@@ -86,7 +86,7 @@ def main():
     os.makedirs('checkpoints', exist_ok=True)
 
     print("开始训练Adam阶段...\n")
-    optimizer_adam = torch.optim.AdamW(model.parameters(), lr=lr_adam)
+    optimizer_adam = torch.optim.AdamW(model.parameters(), lr=lr_adam, weight_decay=1e-5)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_adam, T_max=50, eta_min=1e-6)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer_adam,
