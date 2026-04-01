@@ -108,7 +108,7 @@ def main():
             loss = criterion(curl_pred, curl_target)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-            scheduler.step()
+            optimizer_adam.step()
 
             train_loss += loss.item()
         train_loss /= len(train_loader)
