@@ -100,6 +100,7 @@ def main():
             curl_pred = model(E, r)
             loss = criterion(curl_pred, curl_target)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
             optimizer_adam.step()
             scheduler.step()
 
