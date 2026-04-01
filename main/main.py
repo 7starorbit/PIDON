@@ -112,7 +112,6 @@ def main():
 
             train_loss += loss.item()
         train_loss /= len(train_loader)
-        scheduler.step(train_loss)
 
         # ===== 测试阶段 =====
         model.eval()
@@ -132,6 +131,7 @@ def main():
                 loss = criterion(curl_pred, curl_target)
                 test_loss += loss.item()
             test_loss /= len(test_loader)
+        scheduler.step(test_loss)
 
         # ===== 计算误差 =====
         total_mre = 0.0
