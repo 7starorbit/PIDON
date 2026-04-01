@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import os
 import time
 import matplotlib.pyplot as plt
-from plot import visualize_results, visualize_error_distribution
+from plot import visualize_results, visualize_error_distribution, plot_true_vs_rel_error
 
 def main():
     np.random.seed(1234)
@@ -40,6 +40,9 @@ def main():
     
     # 可视化误差分布
     visualize_error_distribution(model, test_dataset, device, num_samples=num_plot_samples, indices=indices)
+    # 可视化真实值与相对误差的关系
+    plot_true_vs_rel_error(model, test_dataset, device, num_samples=num_plot_samples, indices=indices, mode='slice')
+
 
     print(f"\n{'='*70}")
     print("训练完成!")
